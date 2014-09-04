@@ -1,7 +1,7 @@
 // A directly calculated implementation of the circuit described in
 // "Rolling Your Own Circuit Simulator with Eigen and Boost.ODEInt"
 // Author: Jeff Trull <edaskel@att.net>
-// Boost licensed, boilerplate TBD
+// MIT licensed, boilerplate TBD
 
 #include <cmath>
 #include <iostream>

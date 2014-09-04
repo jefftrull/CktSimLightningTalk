@@ -2,7 +2,7 @@
 // "Rolling Your Own Circuit Simulator with Eigen and Boost.ODEInt"
 // using Eigen to store and manipulate circuit values
 // Author: Jeff Trull <edaskel@att.net>
-// Boost licensed, boilerplate TBD
+// MIT licensed, boilerplate TBD
 
 #include <iostream>
 #include <array>
