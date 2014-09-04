@@ -1,0 +1,13 @@
+.title Simulate an RLC tank for comparison with other approaches
+* by Jeff Trull <edaskel@att.net> 2012-05-25
+
+Vin 1 0 PWL(0 0 10ps 1.0)
+R1  1 2 100
+C1  2 0 20e-9
+L1  2 0 20e-6
+
+.tran 0.1us 10us
+
+.print tran v(2)
+
+.end
