@@ -30,42 +30,7 @@ THE SOFTWARE.
 #include <boost/numeric/odeint.hpp>
 #include <Eigen/Dense>
 
-// "stamp" functions for adding components to a circuit
-template<int sz>
-void stamp_r(Eigen::Matrix<double, sz, sz>& G,
-             Eigen::Matrix<double, sz, sz> const&,
-             int node1, int node2, double r) {
-    // You can think of this as KCL at the two nodes the resistor connects
-    G(node1, node1) += 1.0/r;
-    G(node1, node2) -= 1.0/r;
-    G(node2, node2) += 1.0/r;
-    G(node2, node1) -= 1.0/r;
-}
-
-// voltage source inputs and inductors get this treatment:
-template<int sz>
-void stamp_i(Eigen::Matrix<double, sz, sz>& G,
-             Eigen::Matrix<double, sz, sz> const&,
-             int node, int istate) {
-    G(node, istate) =  1;
-    G(istate, node) = -1;
-}
-
-template<int sz>
-void stamp_c(Eigen::Matrix<double, sz, sz> const&,
-             Eigen::Matrix<double, sz, sz>& C,
-             int node, double c) {
-    C(node, node) += c;  // assumes other terminal is ground
-}
-
-template<int sz>
-void stamp_l(Eigen::Matrix<double, sz, sz>& G,
-             Eigen::Matrix<double, sz, sz>& C,
-             int node, int istate, double l) {
-    C(istate, istate)  +=  l;
-    // For inductors we have an extra state that remembers its current
-    stamp_i(G, C, node, istate);
-}
+#include "mna.hpp"
 
 typedef std::array<double, 2> state_t;   // 0 = V_out, 1 = I_L
 
