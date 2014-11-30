@@ -36,9 +36,13 @@ THE SOFTWARE.
 typedef std::array<double, 2> state_t;   // 0 = V_out, 1 = I_L
 
 struct circuit {
+    circuit(double r, double l, double c) : circuit(r, l, c, 0, true) {}
+
     circuit(double r, double l, double c,
-            double freq   // cycles per second
-        ) : freq_(boost::math::constants::two_pi<double>() * freq) {  // radian/s conversion
+            double freq,        // cycles per second for sine wave
+            bool   step=false   // step response instead
+        ) : freq_(boost::math::constants::two_pi<double>() * freq),  // radian/s conversion
+        step_(step) {
 
         using namespace Eigen;
 
@@ -105,7 +109,12 @@ struct circuit {
         Map<Matrix<double, 2, 1> > result(dxdt.data());
         
         Matrix<double, 1, 1> input;
-        input << std::sin(freq_ * t);
+        if (step_) {
+            input << 1.0;
+        } else {
+            // calculate current value of sine wave input
+            input << std::sin(freq_ * t);
+        }
 
         result = drift_term_ * xvec + input_term_ * input;
 
@@ -116,6 +125,7 @@ private:
     Eigen::MatrixXd input_term_;            // connects input to development
     Eigen::Matrix<double, 1, Eigen::Dynamic> s2o_; // transforms state to output
     double freq_;                           // remembers frequency for calculating input
+    bool   step_;                           // indicates using step function instead of sine wave
 };
 
 int main() {
