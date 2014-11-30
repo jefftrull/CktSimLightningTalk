@@ -161,19 +161,20 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
     // Implements the algorithm in [Natarajan]
     // Circuits, Devices and Systems, IEE Proceedings G, June 1991
 
-    typedef Eigen::Matrix<Float, Eigen::Dynamic, Eigen::Dynamic> MatrixD;
+    using namespace Eigen;
+    typedef Matrix<Float, Dynamic, Dynamic> MatrixD;
 
     // Step 1: put C into "Row Echelon" form by performing LU factorization
     auto lu = C.fullPivLu();
     auto k = lu.rank();
     if (k == C.rows()) {
         // C is already non-singular
-        Eigen::Matrix<Float, ocount, icount>   E = Eigen::Matrix<Float, ocount, icount>::Zero();
+        Matrix<Float, ocount, icount>   E = Matrix<Float, ocount, icount>::Zero();
         return std::make_tuple(G, C, B.back(), D, E);
     }
 
-    MatrixD U = lu.matrixLU().template triangularView<Eigen::Upper>();
-    MatrixD L = lu.matrixLU().template triangularView<Eigen::UnitLower>();
+    MatrixD U = lu.matrixLU().template triangularView<Upper>();
+    MatrixD L = lu.matrixLU().template triangularView<UnitLower>();
 
     // Step 2: "perform the same elementary operations on G and B"
     // given that C = P.inverse() * L * U * Q.inverse()
@@ -187,12 +188,12 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
     MatrixD Gprime = L.fullPivLu().solve(P * G * Q);                   // rows and columns
     MatrixVector<Float, scount, icount> Bprime;
     std::transform(B.begin(), B.end(), std::back_inserter(Bprime),
-                   [L, P](Eigen::Matrix<Float, scount, icount> const& b) -> Eigen::Matrix<Float, scount, icount> {
+                   [L, P](Matrix<Float, scount, icount> const& b) -> Matrix<Float, scount, icount> {
                        return L.fullPivLu().solve(P * b);              // rows only
                    });
 
     // The D input is like L in PRIMA but this algorithm uses the transpose
-    Eigen::Matrix<Float, ocount, scount> Dprime = D.transpose() * Q;          // columns only
+    Matrix<Float, ocount, scount> Dprime = D.transpose() * Q;          // columns only
 
     // Step 3: "Convert [G21 G22] matrix into row echelon form starting from the last row"
     MatrixD Cnew, Gnew, Dnew;
@@ -211,7 +212,7 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
         MatrixD G2R = Gprime.bottomRows(C.rows() - k).reverse();
 
         auto G2R_LU = G2R.fullPivLu();
-        MatrixD G2R_U = (G2R_LU.matrixLU().template triangularView<Eigen::Upper>());
+        MatrixD G2R_U = (G2R_LU.matrixLU().template triangularView<Upper>());
 
         // Since the order of the rows is irrelevant, I'll perform the decomposition, then
         // combine reversing the rows with the row reordering the LU decomposition produces
@@ -226,7 +227,7 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
         // Note: not necessary to do it for C, because all coefficients are zero in those rows
 
         // 4.1 reverse the rows in B2
-        typedef Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic, std::size_t> PermutationD;
+        typedef PermutationMatrix<Dynamic, Dynamic, std::size_t> PermutationD;
         PermutationD reverse_rows;                // order of rows is completely reversed
         reverse_rows.setIdentity(G2R.rows());     // start with null permutation
         for (std::size_t i = 0; i < (G2R.rows() / 2); ++i) {
@@ -234,12 +235,12 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
         }
 
         // 4.2 extract and apply L operation from reversed G2
-        MatrixD G2R_L = G2R_LU.matrixLU().leftCols(G2R.rows()).template triangularView<Eigen::UnitLower>();
+        MatrixD G2R_L = G2R_LU.matrixLU().leftCols(G2R.rows()).template triangularView<UnitLower>();
         std::transform(Bprime.begin(), Bprime.end(), std::back_inserter(Bnew),
                        [reverse_rows, k, G2R_L, G2R_LU]
-                       (Eigen::Matrix<Float, scount, icount> const& bp) {
+                       (Matrix<Float, scount, icount> const& bp) {
                            MatrixD B2R = reverse_rows * bp.bottomRows(bp.rows() - k);
-                           Eigen::Matrix<Float, scount, icount> bn = bp;
+                           Matrix<Float, scount, icount> bn = bp;
                            bn.block(k, 0, bn.rows() - k, bn.cols()) =
                                reverse_rows.transpose() * G2R_L.fullPivLu().solve(G2R_LU.permutationP() * B2R);
                            return bn;
@@ -267,11 +268,11 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
 
     MatrixD Gfinal  = G11 - G12 * G22_LU.solve(G21);
     MatrixD Cfinal  = C11 - C12 * G22_LU.solve(G21);
-    Eigen::Matrix<Float, ocount, Eigen::Dynamic> Dfinal
+    Matrix<Float, ocount, Dynamic> Dfinal
                     = D01 - D02 * G22_LU.solve(G21);
 
-    Eigen::Matrix<Float, Eigen::Dynamic, icount> B02 = Bnew.back().bottomRows(Bnew.back().rows() - k);
-    Eigen::Matrix<Float, ocount, icount> E1
+    Matrix<Float, Dynamic, icount> B02 = Bnew.back().bottomRows(Bnew.back().rows() - k);
+    Matrix<Float, ocount, icount> E1
                     =       D02 * G22_LU.solve(B02);
 
     // reduce the entire series of B's to the new size
@@ -281,31 +282,31 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
     // Bn1 - G12 * G22^-1 * Bn2  to its own term, and
     //     - C12 * G22^-1 * Bn2  to the derivative n+1 coefficient,
     // once reduced.
-    MatrixVector<Float, Eigen::Dynamic, icount> Btrans;
+    MatrixVector<Float, Dynamic, icount> Btrans;
     // n+1's first (equation 9d)
     std::transform(Bnew.begin(), Bnew.end(), std::back_inserter(Btrans),
-                   [k, G12, C12, G22_LU](Eigen::Matrix<Float, scount, icount> const& Bn) {
-                       Eigen::Matrix<Float, Eigen::Dynamic, icount> Bn2 = Bn.bottomRows(Bn.rows() - k);
+                   [k, G12, C12, G22_LU](Matrix<Float, scount, icount> const& Bn) {
+                       Matrix<Float, Dynamic, icount> Bn2 = Bn.bottomRows(Bn.rows() - k);
                        return -C12 * G22_LU.solve(Bn2);
                    });
-    Btrans.push_back(Eigen::Matrix<Float, Eigen::Dynamic, icount>::Zero(k, icount));  // contribution from n-1 is 0 (nonexistent)
+    Btrans.push_back(Matrix<Float, Dynamic, icount>::Zero(k, icount));  // contribution from n-1 is 0 (nonexistent)
 
     // n's next, shifted by one (equation 9c)
     std::transform(Bnew.begin(), Bnew.end(), Btrans.begin()+1, Btrans.begin()+1,
-                   [k, G12, G22_LU](Eigen::Matrix<Float, scount, icount> const& Bn,
-                                         Eigen::Matrix<Float, Eigen::Dynamic, icount> const& Bnm1_contribution)
-                   -> Eigen::Matrix<Float, Eigen::Dynamic, icount> {  // without explicitly declared return type Eigen
+                   [k, G12, G22_LU](Matrix<Float, scount, icount> const& Bn,
+                                         Matrix<Float, Dynamic, icount> const& Bnm1_contribution)
+                   -> Matrix<Float, Dynamic, icount> {  // without explicitly declared return type Eigen
                                                         // will keep references to these locals:
-                       Eigen::Matrix<Float, Eigen::Dynamic, icount> Bn1 = Bn.topRows(k);
-                       Eigen::Matrix<Float, Eigen::Dynamic, icount> Bn2 = Bn.bottomRows(Bn.rows() - k);
+                       Matrix<Float, Dynamic, icount> Bn1 = Bn.topRows(k);
+                       Matrix<Float, Dynamic, icount> Bn2 = Bn.bottomRows(Bn.rows() - k);
 
                        return Bn1 - G12 * G22_LU.solve(Bn2) + Bnm1_contribution;
                    });
 
     // If Cfinal is singular, we need to repeat this analysis on the new matrices
     if (isSingular(Cfinal)) {
-        Eigen::Matrix<Float, Eigen::Dynamic, ocount> Dtrans = Dfinal.transpose();   // no implicit conversion on fn tmpl args
-        auto recursive_result = regularize<icount, ocount, Eigen::Dynamic>(Gfinal, Cfinal, Btrans, Dtrans);
+        Matrix<Float, Dynamic, ocount> Dtrans = Dfinal.transpose();   // no implicit conversion on fn tmpl args
+        auto recursive_result = regularize<icount, ocount, Dynamic>(Gfinal, Cfinal, Btrans, Dtrans);
         return std::make_tuple(std::get<0>(recursive_result),  // G
                                std::get<1>(recursive_result),  // C
                                std::get<2>(recursive_result),  // B
@@ -321,12 +322,12 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
     // Xnew = X - Cr^-1 * B1 * Ws
     // and mentions the rest should be done "recursively".  I believe the general case is:
     // Br = B0 - Gr * Cr^-1 * (B1 - Gr * Cr^-1 *(B2 - ... ))
-    Eigen::Matrix<Float, Eigen::Dynamic, icount> Bfinal = Eigen::Matrix<Float, Eigen::Dynamic, icount>::Zero(k, icount);
+    Matrix<Float, Dynamic, icount> Bfinal = Matrix<Float, Dynamic, icount>::Zero(k, icount);
     Bfinal = std::accumulate(
         // starting with the first (most derived) coefficient, compute above expression for Br:
         Btrans.begin(), Btrans.end(), Bfinal,
-        [Gfinal, Cfinal](Eigen::Matrix<Float, Eigen::Dynamic, icount> const& acc,
-                         Eigen::Matrix<Float, Eigen::Dynamic, icount> const& B) {
+        [Gfinal, Cfinal](Matrix<Float, Dynamic, icount> const& acc,
+                         Matrix<Float, Dynamic, icount> const& B) {
             return B - Gfinal * Cfinal.fullPivHouseholderQr().solve(acc);
         });
 
@@ -336,14 +337,14 @@ regularize(Eigen::Matrix<Float, scount, scount> const & G,
     // Y = D * Xnew + D * Cr^-1 * (B1 - Gr * Cr^-1 * B2) * Ws + Cr^-1 * B2 * Ws'
     // however, if the Ws' term is nonzero the system is ill-formed:
     if (Btrans.size() >= 3) {
-        Eigen::Matrix<Float, Eigen::Dynamic, icount> CinvB = Cfinal.fullPivLu().solve(*(Btrans.rbegin()+2));
+        Matrix<Float, Dynamic, icount> CinvB = Cfinal.fullPivLu().solve(*(Btrans.rbegin()+2));
         assert(CinvB.isZero());
     }
 
     // now I can calculate the new value for E, which can only be:
     // E = E1 + D * Cr^-1 * B1
     // because, thanks to the assertion, all other terms must be 0
-    Eigen::Matrix<Float, ocount, icount> Efinal = E1 + Dfinal * Cfinal.fullPivHouseholderQr().solve(*(Btrans.rbegin()+1));
+    Matrix<Float, ocount, icount> Efinal = E1 + Dfinal * Cfinal.fullPivHouseholderQr().solve(*(Btrans.rbegin()+1));
 
     return std::make_tuple(Gfinal, Cfinal, Bfinal,
                            Dfinal.transpose(),  // for PRIMA compatibility
