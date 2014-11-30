@@ -30,6 +30,7 @@ THE SOFTWARE.
 #include <boost/numeric/odeint.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <Eigen/Dense>
+#include <Eigen/Eigenvalues>
 
 #include "mna.hpp"
 
@@ -93,6 +94,16 @@ struct circuit {
 
         // Vout may have been moved in the reduction process, so we must supply a map
         s2o_        = Dnew;
+
+        // calculate poles of resulting system
+        // they are the eigenvalues of the drift term (a.k.a. the "system matrix")
+        auto evs = EigenSolver<MatrixXd>(drift_term_).eigenvalues();
+        std::cerr << "poles are:\n" << std::endl;
+        for (int row = 0; row < drift_term_.rows(); ++row) {
+            // convert to standard frequency (cycles/s) and display
+            std::cerr << evs(row, 0).real() / boost::math::constants::two_pi<double>() << std::endl;
+        }
+        
 
     }
 
